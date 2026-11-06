@@ -1,7 +1,14 @@
 package main
 
-import "evias/intentd/cmd"
+import (
+	"os"
+
+	"github.com/evias/intentd/cmd"
+)
 
 func main() {
-	cmd.Execute()
+	intentd := cmd.NewCmd()
+	if err := intentd.Execute(); err != nil {
+		os.Exit(1)
+	}
 }

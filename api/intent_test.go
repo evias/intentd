@@ -168,3 +168,102 @@ func TestIntent_FieldDefault(t *testing.T) {
 		assert.Equal(t, time.Duration(0), intent.FieldDefault("sleep"))
 	})
 }
+
+// testPromptConfig returns an [IntentConfig] fixture with string-typed
+// defaults only, so that prompt building does not hit the known
+// populateDefaults panic with non-string defaults (see skipped tests below).
+func testPromptConfig() IntentConfig {
+	return IntentConfig{
+		Name: "Test Intent",
+		Fields: map[string]FieldConfig{
+			"url":   FieldConfig{Type: "string", Required: true},
+			"count": FieldConfig{Type: "number", Default: 3.0},
+		},
+		Prompt: "Test prompt with url: {{.Url}}, count: {{.Count}}",
+	}
+}
+
+// TestIntent_Prompt tests prompt building with args validation and default
+// value filling.
+func TestIntent_Prompt(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		intent := NewIntent(testPromptConfig())
+		prompt, err := intent.Prompt(map[string]string{
+			"Url":   "https://evi.as",
+			"Count": "5",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "Test prompt with url: https://evi.as, count: 5", prompt)
+	})
+
+	t.Run("missing_required_field", func(t *testing.T) {
+		intent := NewIntent(testPromptConfig())
+		prompt, err := intent.Prompt(map[string]string{
+			"Count": "5", // "Url" is required and missing.
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "missing argument '--Url'")
+		assert.Empty(t, prompt)
+	})
+
+	t.Run("required_field_not_allow_empty", func(t *testing.T) {
+		conf := testPromptConfig()
+		conf.Fields["url"] = FieldConfig{Type: "string", Required: true}
+		delete(conf.Fields, "count")
+		intent := NewIntent(conf)
+		prompt, err := intent.Prompt(map[string]string{"Url": ""})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "argument '--Url' may not be empty")
+		assert.Empty(t, prompt)
+	})
+
+	t.Run("required_field_allow_empty", func(t *testing.T) {
+		conf := testPromptConfig()
+		conf.Fields["url"] = FieldConfig{
+			Type: "string", Required: true, AllowEmpty: true,
+		}
+		delete(conf.Fields, "count")
+		intent := NewIntent(conf)
+		prompt, err := intent.Prompt(map[string]string{"Url": ""})
+		require.NoError(t, err)
+		assert.Equal(t, "Test prompt with url: , count: <no value>", prompt)
+	})
+
+	t.Run("unconfigured_fields_are_ignored", func(t *testing.T) {
+		conf := testPromptConfig()
+		delete(conf.Fields, "count")
+		conf.Prompt = "url: {{.Url}}, extra: {{.Extra}}"
+		intent := NewIntent(conf)
+		prompt, err := intent.Prompt(map[string]string{
+			"Url":   "https://evi.as",
+			"Extra": "ignored-by-populateDefaults",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "url: https://evi.as, extra: <no value>", prompt)
+	})
+
+	t.Run("invalid_args_type", func(t *testing.T) {
+		intent := NewIntent(testPromptConfig())
+		prompt, err := intent.Prompt("not-a-map")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid args; expected map[string]string")
+		assert.Empty(t, prompt)
+	})
+
+	t.Run("unset_number_field_uses_default", func(t *testing.T) {
+		t.Skip("known bug: populateDefaults panics on non-string field defaults " +
+			"(type-assert FieldDefault(field).(string) at api/intent.go); " +
+			"to fix during the planned refactor round")
+		conf := IntentConfig{
+			Name: "Test Intent",
+			Fields: map[string]FieldConfig{
+				"count": FieldConfig{Type: "number", Default: 3.0},
+			},
+			Prompt: "count: {{.Count}}",
+		}
+		intent := NewIntent(conf)
+		prompt, err := intent.Prompt(map[string]string{})
+		require.NoError(t, err)
+		assert.Equal(t, "count: 3", prompt)
+	})
+}

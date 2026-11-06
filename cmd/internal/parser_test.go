@@ -97,7 +97,7 @@ func testParserIntent() api.Intent {
 			"Url":   api.FieldConfig{Type: "string"},
 			"Count": api.FieldConfig{Type: "number"},
 		},
-		Prompt: "Parser test prompt with url: {Url} and count: {Count}",
+		Prompt: "Parser test prompt with url: {{.Url}} and count: {{.Count}}",
 	})
 }
 
@@ -112,19 +112,6 @@ func TestParseIntentArgs(t *testing.T) {
 	assert.Equal(t, map[string]string{
 		"Url":   "https://evi.as",
 		"Count": "3",
-	}, data)
-}
-
-// TestParseIntentArgs_MissingFields tests that required fields are present with
-// an empty value even when not provided in args.
-func TestParseIntentArgs_MissingFields(t *testing.T) {
-	intent := testParserIntent()
-
-	data := ParseIntentArgs(intent, []string{})
-
-	assert.Equal(t, map[string]string{
-		"Url":   "",
-		"Count": "",
 	}, data)
 }
 

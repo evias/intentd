@@ -49,14 +49,10 @@ func sliceToMap(args []string) map[string]string {
 			// detects --, but nothing to do
 			continue
 		}
-		if strings.HasPrefix(args[i], "--") {
-			if i+1 < len(args) {
-				isNextLongOpt := strings.HasPrefix(args[i+1], "--")
-				isNextShortOpt := strings.HasPrefix(args[i+1], "-")
-				if !isNextLongOpt && !isNextShortOpt {
-					m[args[i]] = args[i+1]
-					i++ // consume the value
-				}
+		if strings.HasPrefix(args[i], "-") {
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				m[args[i]] = args[i+1]
+				i++ // consume the value
 			} else if strings.Contains(args[i], "=") {
 				nv := strings.SplitN(args[i], "=", 2)
 				m[nv[0]] = nv[1]

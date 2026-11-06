@@ -1,6 +1,8 @@
 package api
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -265,5 +267,73 @@ func TestIntent_Prompt(t *testing.T) {
 		prompt, err := intent.Prompt(map[string]string{})
 		require.NoError(t, err)
 		assert.Equal(t, "count: 3", prompt)
+	})
+}
+
+// TestLoadFromConfig tests loading an [Intent] from a YAML configuration file.
+func TestLoadFromConfig(t *testing.T) {
+	t.Run("missing_file", func(t *testing.T) {
+		_, err := LoadFromConfig(filepath.Join(t.TempDir(), "intent.yaml"))
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "intent config file not found")
+	})
+
+	t.Run("valid_config", func(t *testing.T) {
+		cfgFile := filepath.Join(t.TempDir(), "summarize.yaml")
+		content := `name: Summarize Intent
+description: Summarize Intent Description
+fields:
+  url:
+    type: string
+    required: true
+  count:
+    type: number
+    default: 3
+prompt: |
+  Summarize the following url: {{.Url}}`
+		require.NoError(t, os.WriteFile(cfgFile, []byte(content), 0644))
+
+		intent, err := LoadFromConfig(cfgFile)
+		require.NoError(t, err)
+		require.NotNil(t, intent)
+
+		conf := intent.Config()
+		assert.Equal(t, "Summarize Intent", conf.Name)
+		assert.Equal(t, "Summarize Intent Description", conf.Description)
+		assert.Len(t, conf.Fields, 2)
+		assert.True(t, intent.HasField("url"))
+		assert.True(t, intent.HasField("count"))
+
+		// Options are applied to the loaded intent as well.
+		intentWithOptions, err := LoadFromConfig(cfgFile, func(intent Intent) {
+			agent, ok := intent.(*agentIntent)
+			require.True(t, ok)
+			agent.name = "Overridden Intent"
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "Overridden Intent", intentWithOptions.Name())
+	})
+
+	t.Run("malformed_config", func(t *testing.T) {
+		cfgFile := filepath.Join(t.TempDir(), "broken.yaml")
+		content := "name: [unclosed"
+		require.NoError(t, os.WriteFile(cfgFile, []byte(content), 0644))
+
+		_, err := LoadFromConfig(cfgFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to unmarshal intent config")
+	})
+
+	t.Run("unreadable_file", func(t *testing.T) {
+		if os.Getuid() == 0 {
+			t.Skip("test requires non-root user (unreadable file permissions)")
+		}
+
+		cfgFile := filepath.Join(t.TempDir(), "unreadable.yaml")
+		require.NoError(t, os.WriteFile(cfgFile, []byte("name: test"), 0000))
+
+		_, err := LoadFromConfig(cfgFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read intent config")
 	})
 }

@@ -41,3 +41,12 @@ func UpperFirstFieldName(s string) string {
 	r, i := utf8.DecodeRuneInString(s)
 	return string(unicode.ToUpper(r)) + s[i:]
 }
+
+// LowerFirstFieldName returns a field name with the first character lowercased.
+func LowerFirstFieldName(s string) string {
+	if s == "" {
+		return s
+	}
+	r, i := utf8.DecodeRuneInString(s)
+	return string(unicode.ToLower(r)) + s[i:]
+}

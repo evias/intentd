@@ -29,7 +29,7 @@ func ParseIntentArgs(
 	for field := range intent.Config().Fields {
 		// Note that we *do not accept short form* intent arguments.
 		// i.e. Intent arguments are always long form "--url".
-		f := "--" + strings.ToLower(field)
+		f := "--" + api.LowerFirstFieldName(field)
 		if a, ok := v[f]; ok {
 			// Golang text/template expects uppercase-first keys.
 			key := api.UpperFirstFieldName(field)

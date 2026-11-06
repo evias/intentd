@@ -55,7 +55,7 @@ review processes.`,
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			intentName := args[0]
+			intentName = args[0]
 
 			// If user does not explicitely change the include paths, add intents/.
 			if len(includePaths) == 0 {
@@ -83,13 +83,9 @@ review processes.`,
 			delete(promptArgs, "debug")
 			delete(promptArgs, "include")
 
-			intentArgs := []string{}
-			for a := range promptArgs {
-				intentArgs = append(intentArgs, a)
-			}
-
-			intentArgv := intentName + " with " + strings.Join(intentArgs, ", ")
-			slog.Debug(fmt.Sprintf("Intent: %s", intentArgv))
+			slog.Debug("Intent loaded",
+				"intent", intentName,
+				"args", fmt.Sprintf("%v", promptArgs))
 
 			var (
 				prompt  string
@@ -99,7 +95,7 @@ review processes.`,
 				return argsErr
 			}
 
-			slog.Info(fmt.Sprintf("Prompt: %s", prompt))
+			slog.Debug("Prompt template executed", "prompt", prompt)
 			return nil
 		},
 	}
@@ -115,6 +111,9 @@ review processes.`,
 
 	return intentdCmd
 }
+
+// ----------------------------------------------------------------------------
+// Private implementation
 
 // findIntent searches for intentName using includePaths.
 func findIntent(intentName string) (string, error) {

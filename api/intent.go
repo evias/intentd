@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	tmpl "text/template"
 	"time"
@@ -188,10 +189,15 @@ func (intent *agentIntent) FieldDefault(name string) interface{} {
 		return float64(0)
 
 	case ft == "duration":
+		if f.Default == nil {
+			return time.Duration(0)
+		}
+
 		dur, err := time.ParseDuration(f.Default.(string))
 		if err != nil {
 			return time.Duration(0)
 		}
+
 		return dur
 
 	// Note: attachment field types are empty by default.
@@ -216,23 +222,18 @@ func (intent *agentIntent) validateFields(args any) error {
 	}
 
 	for field, cfg := range intent.Config().Fields {
-		// TODO: should validate content by type.
-		if !cfg.Required {
-			continue
-		}
-
 		// FIXME: use a consistent field name interface.
 		fieldName := UpperFirstFieldName(field)
 		var (
 			sv    string
 			isSet bool
 		)
-		if sv, isSet = asMap[fieldName]; !isSet {
+		if sv, isSet = asMap[fieldName]; cfg.Required && !isSet {
 			return fmt.Errorf("invalid args: missing argument '--%s' (%v)", fieldName, asMap)
 		}
 
 		if !cfg.AllowEmpty && len(sv) == 0 {
-			return fmt.Errorf("invalid args: argument '--%s' may not be empty", fieldName)
+			return fmt.Errorf("invalid args: argument '--%s' may not be empty", field)
 		}
 	}
 
@@ -254,11 +255,26 @@ func (intent *agentIntent) populateDefaults(args any) (out map[string]string, er
 	for field := range intent.Config().Fields {
 		// FIXME: use a consistent field name interface.
 		fn := UpperFirstFieldName(field)
+		ft := intent.FieldType(field)
 		sv := argv[fn]
 
-		// FIXME: emptiness condition for number, duration.
+		// FIXME: emptiness condition for duration.
 		if len(sv) == 0 {
-			out[fn] = intent.FieldDefault(field).(string)
+			fd := intent.FieldDefault(field)
+			switch {
+			case ft == "binary":
+				out[fn] = fmt.Sprintf("%02x", fd)
+			case ft == "number":
+				if iF, okF := fd.(float64); okF {
+					out[fn] = strconv.FormatFloat(iF, 'g', -1, 64)
+				} else if iUI, okUI := fd.(uint64); okUI {
+					out[fn] = strconv.FormatUint(iUI, 10)
+				} else {
+					out[fn] = strconv.Itoa(fd.(int))
+				}
+			default:
+				out[fn] = intent.FieldDefault(field).(string)
+			}
 		} else {
 			out[fn] = sv
 		}

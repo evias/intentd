@@ -35,9 +35,9 @@ repetitively using your preferred cron/PM system.
 ### Building & Running
 
 ```bash
-go build ./...            # build the binary
-go run . <intent> [input] # run an intent locally
-go vet ./...              # static analysis, must pass before pushing
+go build -o intentd main.go   # build the binary
+./intentd <intent> [input]    # run an intent locally
+go vet ./...                  # static analysis, must pass before pushing
 ```
 
 Example usage:

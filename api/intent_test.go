@@ -161,9 +161,6 @@ func TestIntent_FieldDefault(t *testing.T) {
 		assert.Equal(t, time.Duration(0), intent.FieldDefault("sleep"))
 	})
 	t.Run("duration_nil_default", func(t *testing.T) {
-		t.Skip("known bug: FieldDefault panics on nil default for duration fields " +
-			"(type-assert f.Default.(string) at api/intent.go); " +
-			"to fix during the planned refactor round")
 		conf := testIntentConfig()
 		conf.Fields["sleep"] = FieldConfig{Type: "duration"}
 		intent := NewIntent(conf)
@@ -215,7 +212,7 @@ func TestIntent_Prompt(t *testing.T) {
 		intent := NewIntent(conf)
 		prompt, err := intent.Prompt(map[string]string{"Url": ""})
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "argument '--Url' may not be empty")
+		assert.Contains(t, err.Error(), "argument '--url' may not be empty")
 		assert.Empty(t, prompt)
 	})
 
@@ -253,13 +250,10 @@ func TestIntent_Prompt(t *testing.T) {
 	})
 
 	t.Run("unset_number_field_uses_default", func(t *testing.T) {
-		t.Skip("known bug: populateDefaults panics on non-string field defaults " +
-			"(type-assert FieldDefault(field).(string) at api/intent.go); " +
-			"to fix during the planned refactor round")
 		conf := IntentConfig{
 			Name: "Test Intent",
 			Fields: map[string]FieldConfig{
-				"count": FieldConfig{Type: "number", Default: 3.0},
+				"count": FieldConfig{Type: "number", Default: 3.0, AllowEmpty: true},
 			},
 			Prompt: "count: {{.Count}}",
 		}

@@ -79,10 +79,17 @@ review processes.`,
 
 			// e.g. everything after "feed" in: `intentd feed --count=3`
 			dataArgs := os.Args[2:]
-			intentArgv := intentName + " " + strings.Join(dataArgs, " ")
-			slog.Debug(fmt.Sprintf("Intent: %s", intentArgv))
-
 			promptArgs := internal.ParseIntentArgs(intent, dataArgs)
+			delete(promptArgs, "debug")
+			delete(promptArgs, "include")
+
+			intentArgs := []string{}
+			for a := range promptArgs {
+				intentArgs = append(intentArgs, a)
+			}
+
+			intentArgv := intentName + " with " + strings.Join(intentArgs, ", ")
+			slog.Debug(fmt.Sprintf("Intent: %s", intentArgv))
 
 			var (
 				prompt  string

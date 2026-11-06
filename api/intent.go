@@ -109,8 +109,16 @@ func (intent *agentIntent) Prompt(args any) (string, error) {
 		return "", fmt.Errorf("error validating fields: %w", err)
 	}
 
+	var (
+		argv map[string]string
+		err  error
+	)
+	if argv, err = intent.populateDefaults(args); err != nil {
+		return "", fmt.Errorf("error filling default field values: %w", err)
+	}
+
 	var sb strings.Builder
-	if err := intent.tpl.Execute(&sb, args); err != nil {
+	if err = intent.tpl.Execute(&sb, argv); err != nil {
 		return "", fmt.Errorf("error building template: %w", err)
 	}
 
@@ -199,6 +207,8 @@ func (intent *agentIntent) FieldDefault(name string) interface{} {
 // Private implementation
 
 // validateFields verifies the presence of all required fields.
+//
+// TODO(evias): This method expects args with upper-first field names, define as interface.
 func (intent *agentIntent) validateFields(args any) error {
 	asMap, ok := args.(map[string]string)
 	if !ok {
@@ -211,6 +221,7 @@ func (intent *agentIntent) validateFields(args any) error {
 			continue
 		}
 
+		// FIXME: use a consistent field name interface.
 		fieldName := UpperFirstFieldName(field)
 		var (
 			sv    string
@@ -226,4 +237,32 @@ func (intent *agentIntent) validateFields(args any) error {
 	}
 
 	return nil
+}
+
+// populateDefaults replaces empty strings with potential default values.
+//
+// TODO(evias): This method expects args with upper-first field names, define as interface.
+// TODO(evias): The emptiness condition only works for the empty string and empty byte slices.
+func (intent *agentIntent) populateDefaults(args any) (out map[string]string, err error) {
+	argv, ok := args.(map[string]string)
+	if !ok {
+		err = fmt.Errorf("invalid args; expected map[string]string, got %T", args)
+		return // out, err
+	}
+
+	out = make(map[string]string, len(argv))
+	for field := range intent.Config().Fields {
+		// FIXME: use a consistent field name interface.
+		fn := UpperFirstFieldName(field)
+		sv := argv[fn]
+
+		// FIXME: emptiness condition for number, duration.
+		if len(sv) == 0 {
+			out[fn] = intent.FieldDefault(field).(string)
+		} else {
+			out[fn] = sv
+		}
+	}
+
+	return // out, err
 }

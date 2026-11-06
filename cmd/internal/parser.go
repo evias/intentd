@@ -15,6 +15,8 @@ import (
 //
 // Returns a map[string]string with keys from [api.IntentConfig#Fields].
 // Returns a map with keys upper-first, e.g. "Count", "Limit", and "Debug".
+//
+// TODO(evias): Should not populate fields that have no value.
 func ParseIntentArgs(
 	intent api.Intent,
 	args []string,
@@ -33,6 +35,7 @@ func ParseIntentArgs(
 		// Golang text/template expects uppercase-first keys.
 		key := api.UpperFirstFieldName(field)
 
+		// FIXME: Remove this default value setting.
 		data[key] = ""
 		if ok {
 			data[key] = a
@@ -52,9 +55,13 @@ func sliceToMap(args []string) map[string]string {
 			continue
 		}
 		if strings.HasPrefix(args[i], "--") {
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {
-				m[args[i]] = args[i+1]
-				i++ // consume the value
+			if i+1 < len(args) {
+				isNextLongOpt := strings.HasPrefix(args[i+1], "--")
+				isNextShortOpt := strings.HasPrefix(args[i+1], "-")
+				if !isNextLongOpt && !isNextShortOpt {
+					m[args[i]] = args[i+1]
+					i++ // consume the value
+				}
 			} else if strings.Contains(args[i], "=") {
 				nv := strings.SplitN(args[i], "=", 2)
 				m[nv[0]] = nv[1]

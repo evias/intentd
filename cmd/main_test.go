@@ -105,3 +105,32 @@ func TestLoadIntent(t *testing.T) {
 		assert.Equal(t, "Summarize Intent", intent.Name())
 	})
 }
+
+// TestNewCmd tests command wiring: usage, flags and parse behavior.
+func TestNewCmd(t *testing.T) {
+	intentdCmd := NewCmd()
+	require.NotNil(t, intentdCmd)
+
+	t.Run("usage", func(t *testing.T) {
+		assert.Equal(t, "intentd <intent> [input]", intentdCmd.Use)
+		assert.Equal(t, "intentd runs agentic Intents", intentdCmd.Short)
+	})
+
+	t.Run("flag_defaults", func(t *testing.T) {
+		includeFlag := intentdCmd.Flags().Lookup("include")
+		require.NotNil(t, includeFlag)
+		assert.Equal(t, "I", includeFlag.Shorthand)
+		assert.Equal(t, "[./intents/]", includeFlag.DefValue)
+
+		debugFlag := intentdCmd.Flags().Lookup("debug")
+		require.NotNil(t, debugFlag)
+		assert.Equal(t, "D", debugFlag.Shorthand)
+		assert.Equal(t, "false", debugFlag.DefValue)
+	})
+
+	t.Run("unknown_flags_allowed", func(t *testing.T) {
+		// DATA/FIELDS are passed to intents as unknown flags, e.g.
+		// `intentd feed --url https://evi.as/feed/blog.xml`.
+		assert.True(t, intentdCmd.FParseErrWhitelist.UnknownFlags)
+	})
+}

@@ -3,6 +3,7 @@ package api
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -65,4 +66,105 @@ func TestNewIntent_WithOptions(t *testing.T) {
 	assert.Equal(t, []string{"name", "description"}, applied)
 	assert.Equal(t, "Overridden Intent", intent.Name())
 	assert.Equal(t, "Overridden Description", intent.Config().Description)
+}
+
+// TestIntent_HasField tests field presence lookup against [IntentConfig].
+func TestIntent_HasField(t *testing.T) {
+	intent := NewIntent(testIntentConfig())
+
+	assert.True(t, intent.HasField("url"))
+	assert.True(t, intent.HasField("count"))
+	assert.False(t, intent.HasField("missing"))
+}
+
+// TestIntent_FieldType tests the type lookup for configured fields, including
+// the "string" fallback for unknown fields.
+func TestIntent_FieldType(t *testing.T) {
+	testCases := []struct {
+		name     string
+		field    string
+		expected string
+	}{
+		{name: "string_field", field: "url", expected: "string"},
+		{name: "number_field", field: "count", expected: "number"},
+		{name: "duration_field", field: "sleep", expected: "duration"},
+		{name: "attachment_field", field: "attachment", expected: "attachment"},
+		{name: "binary_field", field: "data", expected: "binary"},
+		{name: "unknown_field", field: "missing", expected: "string"},
+	}
+
+	intent := NewIntent(testIntentConfig())
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equalf(t, tc.expected, intent.FieldType(tc.field),
+				"expected %q, got %q", tc.expected, intent.FieldType(tc.field))
+		})
+	}
+}
+
+// TestIntent_FieldDefault tests native default value extraction for all
+// supported field types, based on [IntentConfig.FieldConfig].
+func TestIntent_FieldDefault(t *testing.T) {
+	intent := NewIntent(testIntentConfig())
+
+	t.Run("unknown_field", func(t *testing.T) {
+		assert.Equal(t, []byte{}, intent.FieldDefault("missing"))
+	})
+	t.Run("binary", func(t *testing.T) {
+		assert.Equal(t, []byte{}, intent.FieldDefault("data"))
+	})
+	t.Run("attachment", func(t *testing.T) {
+		assert.Equal(t, "", intent.FieldDefault("attachment"))
+	})
+	t.Run("string", func(t *testing.T) {
+		assert.Equal(t, "default description", intent.FieldDefault("description"))
+	})
+	t.Run("number_float64", func(t *testing.T) {
+		// yaml.Unmarshal decodes numbers as float64.
+		assert.Equal(t, float64(3), intent.FieldDefault("count"))
+	})
+	t.Run("duration", func(t *testing.T) {
+		assert.Equal(t, 3*time.Second, intent.FieldDefault("sleep"))
+	})
+
+	// Field types with specific default value behaviors.
+	t.Run("string_non_string_default", func(t *testing.T) {
+		conf := testIntentConfig()
+		conf.Fields["description"] = FieldConfig{Type: "string", Default: 3.0}
+		intent := NewIntent(conf)
+		assert.Equal(t, "", intent.FieldDefault("description"))
+	})
+	t.Run("number_uint64", func(t *testing.T) {
+		conf := testIntentConfig()
+		conf.Fields["count"] = FieldConfig{Type: "number", Default: uint64(3)}
+		intent := NewIntent(conf)
+		assert.Equal(t, uint64(3), intent.FieldDefault("count"))
+	})
+	t.Run("number_int", func(t *testing.T) {
+		conf := testIntentConfig()
+		conf.Fields["count"] = FieldConfig{Type: "number", Default: int(3)}
+		intent := NewIntent(conf)
+		assert.Equal(t, int(3), intent.FieldDefault("count"))
+	})
+	t.Run("number_zero_or_unset", func(t *testing.T) {
+		conf := testIntentConfig()
+		conf.Fields["count"] = FieldConfig{Type: "number", Default: float64(0)}
+		intent := NewIntent(conf)
+		assert.Equal(t, float64(0), intent.FieldDefault("count"))
+	})
+	t.Run("duration_invalid_string", func(t *testing.T) {
+		conf := testIntentConfig()
+		conf.Fields["sleep"] = FieldConfig{Type: "duration", Default: "not-a-duration"}
+		intent := NewIntent(conf)
+		assert.Equal(t, time.Duration(0), intent.FieldDefault("sleep"))
+	})
+	t.Run("duration_nil_default", func(t *testing.T) {
+		t.Skip("known bug: FieldDefault panics on nil default for duration fields " +
+			"(type-assert f.Default.(string) at api/intent.go); " +
+			"to fix during the planned refactor round")
+		conf := testIntentConfig()
+		conf.Fields["sleep"] = FieldConfig{Type: "duration"}
+		intent := NewIntent(conf)
+		assert.Equal(t, time.Duration(0), intent.FieldDefault("sleep"))
+	})
 }

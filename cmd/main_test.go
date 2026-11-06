@@ -31,3 +31,77 @@ func TestEnsureIncludePaths(t *testing.T) {
 		assert.Contains(t, err.Error(), "not a directory")
 	})
 }
+
+// findIntentsFixtureDir creates a temporary directory containing yaml, yml and
+// non-yaml files, plus a nested directory with an additional yaml file.
+func findIntentsFixtureDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "nested"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "summarize.yaml"), []byte("name: Summarize"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "feed.yml"), []byte("name: Feed"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("not an intent"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "nested", "explain.yaml"), []byte("name: Explain"), 0644))
+	return dir
+}
+
+// TestFindIntents tests the recursive .(yaml|yml) file search.
+func TestFindIntents(t *testing.T) {
+	dir := findIntentsFixtureDir(t)
+
+	intents := findIntents(dir)
+	assert.ElementsMatch(t, []string{
+		filepath.Join(dir, "summarize.yaml"),
+		filepath.Join(dir, "feed.yml"),
+		filepath.Join(dir, "nested", "explain.yaml"),
+	}, intents)
+}
+
+// TestFindIntents_MissingDirectory tests that an empty file list is returned
+// for a directory that does not exist.
+func TestFindIntents_MissingDirectory(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing")
+	assert.Empty(t, findIntents(missing))
+}
+
+// TestFindIntent tests intent file lookup by intent name.
+func TestFindIntent(t *testing.T) {
+	dir := findIntentsFixtureDir(t)
+
+	// findIntent relies on the package-level includePaths variable.
+	oldIncludePaths := includePaths
+	includePaths = []string{dir}
+	defer func() { includePaths = oldIncludePaths }()
+
+	t.Run("found", func(t *testing.T) {
+		file, err := findIntent("summarize")
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(dir, "summarize.yaml"), file)
+	})
+
+	t.Run("not_found", func(t *testing.T) {
+		_, err := findIntent("unknown")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Intent Not Found for 'unknown'")
+	})
+}
+
+// TestLoadIntent tests intent configuration loading from file.
+func TestLoadIntent(t *testing.T) {
+	t.Run("missing_file", func(t *testing.T) {
+		_, err := loadIntent(filepath.Join(t.TempDir(), "missing.yaml"))
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "File not found")
+	})
+
+	t.Run("valid_file", func(t *testing.T) {
+		cfgFile := filepath.Join(t.TempDir(), "summarize.yaml")
+		content := "name: Summarize Intent\nprompt: Summarize {{.Url}}"
+		require.NoError(t, os.WriteFile(cfgFile, []byte(content), 0644))
+
+		intent, err := loadIntent(cfgFile)
+		require.NoError(t, err)
+		require.NotNil(t, intent)
+		assert.Equal(t, "Summarize Intent", intent.Name())
+	})
+}

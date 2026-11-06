@@ -15,8 +15,6 @@ import (
 //
 // Returns a map[string]string with keys from [api.IntentConfig#Fields].
 // Returns a map with keys upper-first, e.g. "Count", "Limit", and "Debug".
-//
-// TODO(evias): Should not populate fields that have no value.
 func ParseIntentArgs(
 	intent api.Intent,
 	args []string,
@@ -29,15 +27,12 @@ func ParseIntentArgs(
 
 	// Make sure we have all fields (required).
 	for field := range intent.Config().Fields {
+		// Note that we *do not accept short form* intent arguments.
+		// i.e. Intent arguments are always long form "--url".
 		f := "--" + strings.ToLower(field)
-		a, ok := v[f]
-
-		// Golang text/template expects uppercase-first keys.
-		key := api.UpperFirstFieldName(field)
-
-		// FIXME: Remove this default value setting.
-		data[key] = ""
-		if ok {
+		if a, ok := v[f]; ok {
+			// Golang text/template expects uppercase-first keys.
+			key := api.UpperFirstFieldName(field)
 			data[key] = a
 		}
 	}

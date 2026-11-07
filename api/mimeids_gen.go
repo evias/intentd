@@ -7584,8 +7584,8 @@ var byID = map[MimeTypeID]string{
 	MimeTypeIDXShaderXVertex: "x-shader/x-vertex",
 }
 
-// FromString resolves a full MIME type string (e.g. "image/png") to its MimeTypeID.
-func FromString(ct string) (MimeTypeID, bool) {
+// MimeTypeIDFromString resolves a full MIME type string (e.g. "image/png") to its MimeTypeID.
+func MimeTypeIDFromString(ct string) (MimeTypeID, bool) {
 	id, ok := byName[strings.ToLower(strings.TrimSpace(ct))]
 	return id, ok
 }

@@ -52,11 +52,12 @@ go test ./... --count=1        # run the unit tests suite
 ### Generating the `MimeTypeID` registry
 
 Use `go generate` to generate up-to-date mime types mappings. It automatically
-downloads the `db.json` from: `https://raw.githubusercontent.com/jshttp/mime-db/master/db.json`.
+downloads the `db.json` from: `https://raw.githubusercontent.com/jshttp/mime-db/release-1-54-0/db.json`.
 
-Note that re-generating the `MimeTypeID` registry may introduce mime types that
-are not yet listed in the repository. Pull requests sending *only* new type
-mappings will be automatically discarded, we'll use Actions for this.
+Note that re-generating the `MimeTypeID` registry from branch `master`
+of the repository `jshttp/mime-db` may introduce mime types that are not yet
+listed in the repository. Pull requests sending *only* new type mappings will
+be automatically discarded, we'll use timely Actions for this.
 
 ```bash
 $ go generate ./...
@@ -66,7 +67,7 @@ Or use the `mimegen` tool directly. Note that the following command is included
 as a `//go generate` build flag already:
 
 ```bash
-$ go run ./cmd/mimegen -url https://raw.githubusercontent.com/jshttp/mime-db/master/db.json -pkg api -o api/mimeids_gen.go
+$ go run ./cmd/mimegen -url https://raw.githubusercontent.com/jshttp/mime-db/release-1-54-0/db.json -pkg api -o api/mimeids_gen.go
 ```
 
 ## Examples

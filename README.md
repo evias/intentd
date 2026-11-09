@@ -77,7 +77,7 @@ $ go run ./cmd/mimegen -url https://raw.githubusercontent.com/jshttp/mime-db/rel
 $ intentd summarize https://evi.as/hire-me
 
 # fetch latest entries from a feed and build insights
-$ intentd feed https://evi.as/feed/blog.xml 
+$ intentd feed --url https://evi.as/feed/blog.xml
 
 # explain what is to be seen on a picture
 $ intentd vision https://evi.as/assets/evias_with_marley_and_maya.png

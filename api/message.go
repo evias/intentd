@@ -96,7 +96,7 @@ func (m *Message) MarshalBinary() ([]byte, error) {
 	}
 	out := make([]byte, PrefixSize+len(m.Payload)) // type+size+bytes
 	binary.BigEndian.PutUint16(out, uint16(m.msgType))
-	binary.BigEndian.PutUint32(out, uint32(len(m.Payload)))
+	binary.BigEndian.PutUint32(out[2:], uint32(len(m.Payload)))
 	copy(out[PrefixSize:], m.Payload)
 	return out, nil
 }

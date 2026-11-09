@@ -65,10 +65,6 @@ func TestMessage_String(t *testing.T) {
 // TestMessage_MarshalBinary tests the type+size-prefixed binary encoding.
 func TestMessage_MarshalBinary(t *testing.T) {
 	t.Run("wire_format", func(t *testing.T) {
-		t.Skip("known bug: MarshalBinary writes the uint32 length at offset 0, " +
-			"clobbering the uint16 type prefix (binary.BigEndian.PutUint32(out, ...) " +
-			"should be PutUint32(out[2:], ...) at api/message.go); " +
-			"to fix during the planned refactor round")
 		msg := NewMessage("image/png", []byte("payload"))
 
 		b, err := msg.MarshalBinary()
@@ -204,9 +200,6 @@ func TestMessage_WriteTo(t *testing.T) {
 	})
 
 	t.Run("roundtrip", func(t *testing.T) {
-		t.Skip("known bug: blocked by MarshalBinary writing the uint32 length " +
-			"at offset 0, clobbering the uint16 type prefix (api/message.go); " +
-			"to fix during the planned refactor round")
 		var buf bytes.Buffer
 		msg := NewMessage("image/png", []byte("payload"))
 

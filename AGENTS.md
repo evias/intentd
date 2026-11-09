@@ -12,8 +12,8 @@ The `intentd` tool features a suite of pre-defined *intents* that may be run
 repetitively using your preferred cron/PM system.
 
 - Module name: `evias/intentd`
-- Language: Go (1.26+)
-- Dependencies: [Cobra](https://github.com/spf13/cobra) only, for now
+- Language: Go (1.27+)
+- Dependencies: [Cobra](https://github.com/spf13/cobra), [Testify](github.com/stretchr/testify), [YAMLv3](go.yaml.in/yaml/v3), [OpenAI](https://github.com/openai/openai-go)
 
 ## Repository Layout
 
@@ -35,16 +35,11 @@ repetitively using your preferred cron/PM system.
 ### Building & Running
 
 ```bash
-go build -o intentd main.go   # build the binary
-./intentd <intent> [input]    # run an intent locally
-go vet ./...                  # static analysis, must pass before pushing
-```
-
-Example usage:
-
-```bash
-intentd summarize https://evi.as/hire-me
-intentd explain https://evias.be/assets/bitcoin.pdf
+go build -o intentd main.go    # build the binary
+go build -o mimegen cmd/mimegen # build the mimegen tool
+./intentd <intent> [input] # run an intent locally
+go vet ./...                   # static analysis, must pass before pushing
+go test ./... --count=1        # run the unit tests suite
 ```
 
 ### Code Conventions
@@ -54,6 +49,7 @@ intentd explain https://evias.be/assets/bitcoin.pdf
 - Each intent subcommand lives in its own file under `cmd/` and is registered
   with `rootCmd` via `AddCommand` in `cmd/main.go:init()`.
 - Keep external dependencies minimal.
+- Do not re-generate the `api/mimeids_gen.go` file, i.e. don't use `go generate`.
 
 ### Git Strategy
 

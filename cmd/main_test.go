@@ -120,7 +120,7 @@ func TestNewCmd(t *testing.T) {
 		includeFlag := intentdCmd.Flags().Lookup("include")
 		require.NotNil(t, includeFlag)
 		assert.Equal(t, "I", includeFlag.Shorthand)
-		assert.Equal(t, "[./intents/]", includeFlag.DefValue)
+		assert.Equal(t, "[intents/]", includeFlag.DefValue)
 
 		debugFlag := intentdCmd.Flags().Lookup("debug")
 		require.NotNil(t, debugFlag)

@@ -32,7 +32,7 @@ type Intent interface {
 	Prompt(args any) (string, error)
 }
 
-// IntentOption defines the contract for [Driver] option helpers.
+// IntentOption defines the contract for [Intent] option helpers.
 type IntentOption func(Intent)
 
 // ----------------------------------------------------------------------------

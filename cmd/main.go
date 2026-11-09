@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -16,11 +17,15 @@ import (
 
 const (
 	defaultIncludePath = "intents/"
+	defaultModelName   = "gva/gemini-3.8-flash"
 )
 
 var (
-	includePaths = []string{}
 	intentName   string
+	modelName    string
+	userAPIKey   string
+	includePaths = []string{}
+	quietMode    bool
 	enableDebug  bool
 )
 
@@ -62,6 +67,14 @@ review processes.`,
 				includePaths = []string{defaultIncludePath}
 			}
 
+			if len(modelName) == 0 {
+				modelName = defaultModelName
+			}
+
+			if len(userAPIKey) == 0 {
+				return errors.New("api: missing api key, set with --apiKey.")
+			}
+
 			var (
 				intentFile string
 				intent     api.Intent
@@ -96,6 +109,28 @@ review processes.`,
 			}
 
 			slog.Debug("Prompt template executed", "prompt", prompt)
+
+			provider := api.NewProvider("dHealth Intelligence", "https://ai.chatboxai.app",
+				api.WithAPIKey(userAPIKey),
+			)
+
+			var (
+				response api.Response
+				request  = api.Request{
+					api.NewMessage("text/plain", []byte(prompt)),
+				}
+			)
+			if response, err = provider.Call(modelName, request); err != nil {
+				return err
+			}
+
+			if !quietMode {
+				slog.Info("Provider call successful", "req", request, "res", response)
+			} else {
+				// in quiet mode, print only in debug log.
+				slog.Debug("Provider call successful", "req", request, "res", response)
+			}
+
 			return nil
 		},
 	}
@@ -104,8 +139,14 @@ review processes.`,
 	// e.g. `intentd feed --url https://evi.as/feed/blog.xml`
 	intentdCmd.FParseErrWhitelist.UnknownFlags = true
 
-	intentdCmd.Flags().StringArrayVarP(&includePaths, "include", "I", []string{"./intents/"},
+	intentdCmd.Flags().StringVarP(&userAPIKey, "apiKey", "k", "",
+		"Sets the API Key used for the OpenAI client connection (optional).")
+	intentdCmd.Flags().StringVarP(&modelName, "model", "m", defaultModelName,
+		"Sets the model that will be used for this conversation (optional).")
+	intentdCmd.Flags().StringArrayVarP(&includePaths, "include", "I", []string{defaultIncludePath},
 		"Specify folders to include for the intents search (optional).")
+	intentdCmd.Flags().BoolVarP(&quietMode, "quiet", "Q", false,
+		"Sets whether to enable quiet mode or not (optional).")
 	intentdCmd.Flags().BoolVarP(&enableDebug, "debug", "D", false,
 		"Sets whether to enable debug mode/logs or not (optional).")
 

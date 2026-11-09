@@ -86,9 +86,10 @@ func (m *Message) String() string {
 
 var ErrShort = errors.New("msg: buffer too short")
 
-// MarshalBinary encodes the message to a size-prefixed bytes slice or returns
-// an error. It prepends the payload size to the payload bytes as a Uint32.
-// Wire format: [uint32 big-endian length][payload]
+// MarshalBinary encodes the message to a type+size-prefixed bytes slice or
+// returns an error. It prepends the content type and payload size to the
+// payload bytes, respectively as a Uint16 (type) and as a Uint32 (size).
+// Wire format: [uint16 big-endian type][uint32 big-endian length][payload]
 // MarshalBinary implements encoding.BinaryMarshaler
 func (m *Message) MarshalBinary() ([]byte, error) {
 	if len(m.Payload) > MaxPayload {
@@ -101,9 +102,9 @@ func (m *Message) MarshalBinary() ([]byte, error) {
 	return out, nil
 }
 
-// UnmarshalBinary decodes a size-prefixed bytes payload to a [Message#Payload]
-// or returns an error. It expects at least 4 bytes (the size prefix as uint32),
-// and it enforces a MaxPayload size of 1Mb (`1 << 20`).
+// UnmarshalBinary decodes a type+size-prefixed bytes payload to a [Message#Payload]
+// or returns an error. It expects at least 6 bytes, i.e. the type+size prefix
+// as uint16+uint32, and it enforces a MaxPayload size (16Mb for now).
 // UnmarshalBinary implements encoding.BinaryUnmarshaler
 func (m *Message) UnmarshalBinary(b []byte) error {
 	if len(b) < PrefixSize {

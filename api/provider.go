@@ -110,7 +110,7 @@ func (p *llmProvider) Call(model string, req Request) (Response, error) {
 func (p *llmProvider) getClient() Client {
 	switch {
 	case p.apiType == APITypeOpenAI:
-		p.client = NewClient(p.apiKey)
+		p.client = NewClient(p.baseURL, p.apiKey)
 
 	default:
 		panic("apiType '" + p.apiType + "' is not yet implemented")
@@ -136,9 +136,10 @@ type openAIClient struct {
 var _ Client = (*openAIClient)(nil)
 
 // TODO: add ollama API type client
-func NewClient(apiKey string, options ...ClientOption) Client {
+func NewClient(baseURL, apiKey string, options ...ClientOption) Client {
 	c := &openAIClient{
 		client: openai.NewClient(
+			option.WithBaseURL(baseURL),
 			option.WithAPIKey(apiKey),
 		),
 	}

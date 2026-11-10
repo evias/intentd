@@ -110,7 +110,7 @@ review processes.`,
 
 			slog.Debug("Prompt template executed", "prompt", prompt)
 
-			provider := api.NewProvider("dHealth Intelligence", "https://ai.chatboxai.app",
+			provider := api.NewProvider("dHealth Intelligence", "https://ai.dhealth.com/v1",
 				api.WithAPIKey(userAPIKey),
 			)
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/responses"
 )
 
 type APIType string
@@ -151,28 +152,33 @@ func NewClient(baseURL, apiKey string, options ...ClientOption) Client {
 	return c
 }
 
-// Send should use the underlying client to send a message.
+// Send uses the [openai.Client] to create a Responses API conversation.
+// CAUTION: Currently only support text-based input/output.
+//
+// TODO: context should be fed from caller/provider.
+// TODO: should permit image/audio/files input.
+// TODO: should permit image/audio/files output.
 func (c *openAIClient) Send(model string, req Request) (Response, error) {
-	msgUnion := []openai.ChatCompletionMessageParamUnion{}
+	msgUnion := responses.ResponseNewParamsInputUnion{}
 	for _, msg := range req {
 		if msg.IsText() {
-			msgUnion = append(msgUnion, openai.UserMessage(msg.String()))
+			msgUnion.OfString = openai.String(msg.String())
 		}
-
-		// TODO: uploads, images, audio, etc.
+		// TODO: should permit image/audio/files input.
 	}
 
-	chat, err := c.client.Chat.Completions.New(context.Background(), openai.ChatCompletionNewParams{
-		Messages: msgUnion,
-		Model:    model,
-	})
+	// TODO: context should be fed from caller/provider.
+	resp, err := c.client.Responses.New(context.Background(), responses.ResponseNewParams{
+		Input: msgUnion,
+		Model: model,
+	}, option.WithHeader("HTTP-Referer", "https://ai.dhealth.com"),
+		option.WithHeader("X-Title", "AIDH Bots"))
 	if err != nil {
 		return Response{}, fmt.Errorf("openai: chat completion error: %w", err)
 	}
 
-	// TODO: chat completion message contains `.Audio`
-	// TODO: chat completion with image and other media
+	// TODO: should permit image/audio/files output.
 	return Response{
-		NewMessage("text/plain", []byte(chat.Choices[0].Message.Content)),
+		NewMessage("text/plain", []byte(resp.OutputText())),
 	}, nil
 }

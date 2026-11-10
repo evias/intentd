@@ -18,12 +18,14 @@ import (
 const (
 	defaultIncludePath = "intents/"
 	defaultModelName   = "gva/gemini-3.8-flash"
+	defaultBaseURL     = "https://ai.chatboxai.app/v1"
 )
 
 var (
 	intentName   string
 	modelName    string
-	userAPIKey   string
+	apiKey       string
+	apiUrl       string
 	includePaths = []string{}
 	quietMode    bool
 	enableDebug  bool
@@ -71,8 +73,12 @@ review processes.`,
 				modelName = defaultModelName
 			}
 
-			if len(userAPIKey) == 0 {
+			if len(apiKey) == 0 {
 				return errors.New("api: missing api key, set with --apiKey.")
+			}
+
+			if len(apiUrl) == 0 {
+				return errors.New("api: missing api url, set with --apiUrl.")
 			}
 
 			var (
@@ -110,8 +116,8 @@ review processes.`,
 
 			slog.Debug("Prompt template executed", "prompt", prompt)
 
-			provider := api.NewProvider("dHealth Intelligence", "https://ai.dhealth.com/v1",
-				api.WithAPIKey(userAPIKey),
+			provider := api.NewProvider("OpenAI API Provider", apiUrl,
+				api.WithAPIKey(apiKey),
 			)
 
 			var (
@@ -139,8 +145,10 @@ review processes.`,
 	// e.g. `intentd feed --url https://evi.as/feed/blog.xml`
 	intentdCmd.FParseErrWhitelist.UnknownFlags = true
 
-	intentdCmd.Flags().StringVarP(&userAPIKey, "apiKey", "k", "",
-		"Sets the API Key used for the OpenAI client connection (optional).")
+	intentdCmd.Flags().StringVarP(&apiKey, "apiKey", "k", "",
+		"Sets the API Key used for the OpenAI client connection. Required.")
+	intentdCmd.Flags().StringVarP(&apiUrl, "apiUrl", "U", defaultBaseURL,
+		"Sets the API URL used for the OpenAI client connection (optional).")
 	intentdCmd.Flags().StringVarP(&modelName, "model", "m", defaultModelName,
 		"Sets the model that will be used for this conversation (optional).")
 	intentdCmd.Flags().StringArrayVarP(&includePaths, "include", "I", []string{defaultIncludePath},

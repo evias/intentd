@@ -17,7 +17,7 @@ func TestNewProvider(t *testing.T) {
 
 	assert.Equal(t, "OpenAI", p.Name())
 	assert.Equal(t, APITypeOpenAI, p.Type())
-	assert.Equal(t, "https://api.openai.com/v1/", p.BaseURL())
+	assert.Equal(t, "https://api.openai.com/v1", p.BaseURL())
 }
 
 // TestProvider_BaseURL tests trailing-slash normalization of the base url.
@@ -27,9 +27,9 @@ func TestProvider_BaseURL(t *testing.T) {
 		baseURL  string
 		expected string
 	}{
-		{name: "without_trailing_slash", baseURL: "https://api.openai.com/v1", expected: "https://api.openai.com/v1/"},
-		{name: "with_trailing_slash", baseURL: "https://api.openai.com/v1/", expected: "https://api.openai.com/v1/"},
-		{name: "empty", baseURL: "", expected: "/"},
+		{name: "without_trailing_slash", baseURL: "https://api.openai.com/v1", expected: "https://api.openai.com/v1"},
+		{name: "with_trailing_slash", baseURL: "https://api.openai.com/v1/", expected: "https://api.openai.com/v1"},
+		{name: "empty", baseURL: "", expected: ""},
 	}
 
 	for _, tc := range testCases {
@@ -134,7 +134,7 @@ func TestProvider_Call(t *testing.T) {
 			NewMessage("text/plain", []byte("Hi there")),
 		})
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "openai: chat completion error")
+		assert.Contains(t, err.Error(), "openai: failed to execute chat completion")
 		assert.Empty(t, resp)
 	})
 }

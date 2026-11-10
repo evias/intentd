@@ -1,10 +1,12 @@
 package api
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,27 +70,63 @@ func TestProvider_GetClient_Panic(t *testing.T) {
 	})
 }
 
-// newTestServer creates a fake OpenAI-compatible http server returning the
-// given response body, optionally capturing the received request body.
-func newTestServer(t *testing.T, response string, received *string) *httptest.Server {
+// sseBody returns a Server-Sent Events formatted chat completion stream body
+// with the given delta contents, terminated by the [DONE] marker.
+func sseBody(contents ...string) string {
+	var sb strings.Builder
+	for _, c := range contents {
+		chunk := fmt.Sprintf(
+			`{"id":"chatcmpl-test","object":"chat.completion.chunk","model":"gpt-4","choices":[{"index":0,"delta":{"content":%q}}]}`,
+			c)
+		sb.WriteString("data: " + chunk + "\n\n")
+	}
+	sb.WriteString("data: [DONE]\n\n")
+	return sb.String()
+}
+
+// newSSEServer creates a fake OpenAI-compatible http server responding to
+// each request with the next Server-Sent Events body from responses, and
+// optionally capturing each received request body.
+func newSSEServer(t *testing.T, responses []string, received *[]string) *httptest.Server {
 	t.Helper()
+	var mu sync.Mutex
+	requestCount := 0
+
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		i := requestCount
+		requestCount++
+		mu.Unlock()
+
 		if received != nil {
 			body, _ := io.ReadAll(r.Body)
-			*received = string(body)
+			*received = append(*received, string(body))
 		}
 
-		w.Header().Set("Content-Type", "application/json")
+		response := ""
+		if i < len(responses) {
+			response = responses[i]
+		}
+
+		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = w.Write([]byte(response))
 	}))
 }
 
 // TestProvider_Call tests [Provider.Call] against a fake OpenAI-compatible
 // http server, using the provider's forwarded baseURL.
+//
+// The current implementation of [openAIClient.Send] performs 2 rounds of
+// streaming Chat Completions API calls: a first pass with tool definitions
+// (injecting potential `native_fetch` calls), and a second pass generating
+// the actual response. The response text is the concatenation of both passes.
 func TestProvider_Call(t *testing.T) {
 	t.Run("text_message", func(t *testing.T) {
-		var receivedBody string
-		srv := newTestServer(t, `{"choices":[{"index":0,"message":{"role":"assistant","content":"Hello!"}}]}`, &receivedBody)
+		var receivedBodies []string
+		srv := newSSEServer(t, []string{
+			sseBody("Hello!"),      // 1st pass: tool detection
+			sseBody("Hello again"), // 2nd pass: response generation
+		}, &receivedBodies)
 		defer srv.Close()
 
 		p := NewProvider("Test", srv.URL, WithAPIKey("test-key"))
@@ -99,16 +137,26 @@ func TestProvider_Call(t *testing.T) {
 		require.Len(t, resp, 1)
 
 		assert.True(t, resp[0].IsText())
-		assert.Equal(t, "Hello!", resp[0].String())
+		assert.Equal(t, "Hello!Hello again", resp[0].String())
 
 		// The request body must contain the sent user message.
-		assert.Contains(t, receivedBody, "Hi there")
-		assert.Contains(t, receivedBody, "gpt-4")
+		require.Len(t, receivedBodies, 2)
+		for _, body := range receivedBodies {
+			assert.Contains(t, body, "Hi there")
+			assert.Contains(t, body, "gpt-4")
+		}
+
+		// Only the first pass carries the tool definitions.
+		assert.Contains(t, receivedBodies[0], "native_fetch")
+		assert.NotContains(t, receivedBodies[1], "native_fetch")
 	})
 
 	t.Run("non_text_messages_are_filtered", func(t *testing.T) {
-		var receivedBody string
-		srv := newTestServer(t, `{"choices":[{"index":0,"message":{"role":"assistant","content":""}}]}`, &receivedBody)
+		var receivedBodies []string
+		srv := newSSEServer(t, []string{
+			sseBody(""), // empty delta content
+			sseBody(""),
+		}, &receivedBodies)
 		defer srv.Close()
 
 		p := NewProvider("Test", srv.URL, WithAPIKey("test-key"))
@@ -117,9 +165,13 @@ func TestProvider_Call(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Len(t, resp, 1)
+		assert.Empty(t, resp[0].String())
 
 		// Only text messages are appended to the chat completion request.
-		assert.False(t, strings.Contains(receivedBody, "fake-image-bytes"))
+		require.Len(t, receivedBodies, 2)
+		for _, body := range receivedBodies {
+			assert.False(t, strings.Contains(body, "fake-image-bytes"))
+		}
 	})
 
 	t.Run("http_error", func(t *testing.T) {

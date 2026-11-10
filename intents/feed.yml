@@ -1,0 +1,31 @@
+name: "Feed"
+description: "This intent summarizes a feed into Weekly Insights"
+fields:
+  url:
+    type: string
+    default: ""
+    required: true
+    allowEmpty: false
+  label:
+    type: string
+    default: "Weekly Insights"
+    required: false
+    allowEmpty: true
+  startDate:
+    type: string
+    default: "one week ago"
+    required: false
+    allowEmpty: true
+  endDate:
+    type: string
+    default: "today"
+    required: false
+    allowEmpty: true
+prompt: >
+  Fetch latest topics from {{.Url}}. Optionally, with a publication date
+  between {{.StartDate}} and {{.EndDate}}.
+  Then provide a concise summary description, listing the most important
+  information contained in the articles and brand it "{{.Label}}".
+  The overview should be about three paragraphs long.
+  Do not hallucinate. Add only sourced information from the latest topics.
+  At the end of the overview, add a table with links to the latest topics.

@@ -1,0 +1,13 @@
+name: "Explain"
+description: "This intent explains a topic in one or two paragraphs (ELI5)"
+fields:
+  topic:
+    type: string
+    default: ""
+    required: true
+    allowEmpty: false
+prompt: >
+  Explain {{.Topic}} to me like I'm 5 years old,
+  i.e. create an ELI5 for {{.Topic}}.
+  The explanation should be about one or two paragraphs long.
+  Do not hallucinate.

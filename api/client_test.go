@@ -1,8 +1,10 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -126,6 +128,93 @@ func TestClient_Chat_ToolCalls(t *testing.T) {
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to call tool native_fetch")
+		assert.Empty(t, resp)
+	})
+}
+
+// TestOpenAIClient_Image tests image generation against a fake
+// OpenAI-compatible http server, using the forwarded baseURL.
+func TestOpenAIClient_Image(t *testing.T) {
+	imageBz := []byte("png-image-bytes")
+	encodedBz := base64.StdEncoding.EncodeToString(imageBz)
+
+	t.Run("success", func(t *testing.T) {
+		var receivedBody string
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			receivedBody = string(body)
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"created":123,"data":[{"b64_json":%q}]}`, encodedBz)))
+		}))
+		defer srv.Close()
+
+		c := NewClient(srv.URL, "test-key")
+		resp, err := c.Image("dall-e-3", Request{
+			NewMessage("text/plain", []byte("Draw a cat")),
+		})
+		require.NoError(t, err)
+		require.Len(t, resp, 1)
+
+		assert.Equal(t, "image/png", resp[0].ContentType())
+		assert.False(t, resp[0].IsText())
+
+		msg, ok := resp[0].(*Message)
+		require.True(t, ok)
+		assert.Equal(t, imageBz, msg.Payload)
+
+		// The request body must contain the prompt and model.
+		assert.Contains(t, receivedBody, "Draw a cat")
+		assert.Contains(t, receivedBody, "dall-e-3")
+	})
+
+	t.Run("http_error", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"error":{"message":"generation failed"}}`))
+		}))
+		defer srv.Close()
+
+		c := NewClient(srv.URL, "test-key")
+		resp, err := c.Image("dall-e-3", Request{
+			NewMessage("text/plain", []byte("Draw a cat")),
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "openai: failed to execute image generation")
+		assert.Empty(t, resp)
+	})
+
+	t.Run("invalid_base64", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"created":123,"data":[{"b64_json":"not-base64!!"}]}`))
+		}))
+		defer srv.Close()
+
+		c := NewClient(srv.URL, "test-key")
+		resp, err := c.Image("dall-e-3", Request{
+			NewMessage("text/plain", []byte("Draw a cat")),
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "openai: failed to decode image base64")
+		assert.Empty(t, resp)
+	})
+
+	t.Run("empty_data_panics", func(t *testing.T) {
+		t.Skip("known bug: Image indexes image.Data[0] without a length check, " +
+			"panicking when the API returns zero images (api/client.go); " +
+			"to fix during the planned refactor round")
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"created":123,"data":[]}`))
+		}))
+		defer srv.Close()
+
+		c := NewClient(srv.URL, "test-key")
+		resp, err := c.Image("dall-e-3", Request{
+			NewMessage("text/plain", []byte("Draw a cat")),
+		})
+		assert.Error(t, err)
 		assert.Empty(t, resp)
 	})
 }

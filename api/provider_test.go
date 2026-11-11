@@ -70,6 +70,63 @@ func TestProvider_GetClient_Panic(t *testing.T) {
 	})
 }
 
+// TestProvider_ClientCaching tests that getClient only creates the underlying
+// client once, and reuses it on subsequent Generate calls.
+func TestProvider_ClientCaching(t *testing.T) {
+	p := NewProvider("Test", "https://api.openai.com/v1")
+
+	lp, ok := p.(*llmProvider)
+	require.True(t, ok)
+	assert.Nil(t, lp.client) // no client before the first Generate call
+
+	srv := newSSEServer(t, []string{
+		sseBody("first"),  // 1st pass
+		sseBody("second"), // 2nd pass
+	}, nil)
+	defer srv.Close()
+
+	p2 := NewProvider("Test", srv.URL, WithAPIKey("test-key"))
+	lp2, ok := p2.(*llmProvider)
+	require.True(t, ok)
+
+	_, err := p2.Generate(OutputTypeChat, "gpt-4", Request{
+		NewMessage("text/plain", []byte("Hi there")),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, lp2.client)
+
+	first := lp2.client
+	_, err = p2.Generate(OutputTypeChat, "gpt-4", Request{
+		NewMessage("text/plain", []byte("Hi there")),
+	})
+	require.NoError(t, err)
+
+	// The same client instance must be reused.
+	assert.Same(t, first, lp2.client)
+}
+
+// TestProvider_Generate_UnknownOutputType tests that an unknown [OutputType]
+// falls back to the Chat generation flow.
+func TestProvider_Generate_UnknownOutputType(t *testing.T) {
+	var receivedBodies []string
+	srv := newSSEServer(t, []string{
+		sseBody("Hello!"),  // 1st pass
+		sseBody("Replied"), // 2nd pass
+	}, &receivedBodies)
+	defer srv.Close()
+
+	p := NewProvider("Test", srv.URL, WithAPIKey("test-key"))
+	resp, err := p.Generate(OutputType("unknown"), "gpt-4", Request{
+		NewMessage("text/plain", []byte("Hi there")),
+	})
+	require.NoError(t, err)
+	require.Len(t, resp, 1)
+
+	// Unknown output types are handled by the Chat flow.
+	assert.True(t, resp[0].IsText())
+	assert.Equal(t, "Hello!Replied", resp[0].String())
+}
+
 // sseBody returns a Server-Sent Events formatted chat completion stream body
 // with the given delta contents, terminated by the [DONE] marker.
 func sseBody(contents ...string) string {

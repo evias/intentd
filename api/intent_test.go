@@ -15,6 +15,7 @@ import (
 func testIntentConfig() IntentConfig {
 	return IntentConfig{
 		Name:        "Test Intent",
+		OutputType:  OutputTypeChat,
 		Description: "Test Intent Description",
 		Fields: map[string]FieldConfig{
 			"url":         FieldConfig{Type: "string", Required: true},
@@ -35,6 +36,7 @@ func TestNewIntent(t *testing.T) {
 	intent := NewIntent(conf)
 
 	assert.Equal(t, conf.Name, intent.Name())
+	assert.Equal(t, conf.OutputType, intent.Type())
 	assert.Equal(t, conf.Description, intent.Config().Description)
 	assert.Equal(t, conf.Prompt, intent.Config().Prompt)
 	assert.Equal(t, conf.Fields, intent.Config().Fields)
@@ -275,6 +277,7 @@ func TestLoadFromConfig(t *testing.T) {
 	t.Run("valid_config", func(t *testing.T) {
 		cfgFile := filepath.Join(t.TempDir(), "summarize.yaml")
 		content := `name: Summarize Intent
+type: chat
 description: Summarize Intent Description
 fields:
   url:
@@ -293,6 +296,7 @@ prompt: |
 
 		conf := intent.Config()
 		assert.Equal(t, "Summarize Intent", conf.Name)
+		assert.Equal(t, OutputTypeChat, conf.OutputType)
 		assert.Equal(t, "Summarize Intent Description", conf.Description)
 		assert.Len(t, conf.Fields, 2)
 		assert.True(t, intent.HasField("url"))

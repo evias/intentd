@@ -145,10 +145,11 @@ review processes.`,
 
 			slog.Debug("Provider call successful", "model", modelName, "res", response)
 
-			var responseText strings.Builder
-			if !quietMode {
-				for _, resp := range response {
-					responseText.WriteString(resp.String())
+			responseBz := []byte{}
+			for _, resp := range response {
+				responseBz = append(responseBz, resp.Raw()...)
+
+				if resp.IsText() && !quietMode {
 					fmt.Printf("\n%s\n", resp.String())
 				}
 			}
@@ -160,7 +161,7 @@ review processes.`,
 					return err
 				}
 
-				f.WriteString(responseText.String())
+				f.Write(responseBz)
 				f.Close()
 			}
 

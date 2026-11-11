@@ -26,6 +26,8 @@ type Streamable interface {
 	ToBytes() ([]byte, error)
 	// String should return the string representation of the message.
 	String() string
+	// Raw should return the raw bytes slice, i.e. without type+size prefix.
+	Raw() []byte
 
 	// WriteTo should write the type+size-prefixed message to a [io.Writer].
 	WriteTo(w io.Writer) (int64, error)
@@ -80,6 +82,12 @@ func (m *Message) ToBytes() ([]byte, error) { return m.MarshalBinary() }
 // String returns a string representation of the [Message#Payload].
 func (m *Message) String() string {
 	return string(m.Payload)
+}
+
+// Raw returns the raw bytes slice, i.e. without type+size prefix.
+// IMPORTANT: This method always returns a *copy* of the slice.
+func (m *Message) Raw() []byte {
+	return m.Payload[:]
 }
 
 // ----------------------------------------------------------------------------

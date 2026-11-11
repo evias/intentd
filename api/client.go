@@ -112,9 +112,10 @@ func (c *openAIClient) Image(model string, req Request) (Response, error) {
 
 	// TODO: context should be fed from caller/provider.
 	image, err := c.client.Images.Generate(context.Background(), openai.ImageGenerateParams{
-		Prompt: prompt,
-		Model:  model,
-		N:      openai.Int(1), // TODO: supports only one image generation for now.
+		Prompt:         prompt,
+		Model:          model,
+		N:              openai.Int(1), // TODO: supports only one image generation for now.
+		ResponseFormat: openai.ImageGenerateParamsResponseFormatB64JSON,
 	}, option.WithHeader("X-Title", "intentd runtime"))
 	if err != nil {
 		return Response{}, fmt.Errorf("openai: failed to execute image generation: %w", err)

@@ -1,0 +1,20 @@
+name: "Vision"
+type: "chat"
+description: "This intent describes what is to be seen on a picture"
+fields:
+  url:
+    type: string
+    default: ""
+    required: true
+    allowEmpty: false
+prompt: >
+  Analyze the image at {{.Url}} and provide a concise summary description of the scene,
+  including objects, people, pets, environment, and any other relevant details.
+  Include the color, texture, and any distinguishing features of the objects and
+  people visible in the image. Additionally, describe any patterns, activities,
+  or unusual elements that may be present in the scene.
+  As a response you should generate a one paragraph summary of the description. 
+  After the summary, add a one-liner with the count of humans, the count of dogs,
+  and the count of cats detected in the image. If you detected none of these,
+  just use 0, e.g. `humans=0, dogs=0, cats=0`. Use a simple comma-separated
+  key value format like shown. Don't add any more information.

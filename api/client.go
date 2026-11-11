@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -204,6 +203,8 @@ func (c *openAIClient) executeChatCompletionWithToolCalls(
 
 // processInternalToolCalls forwards tool call messages with function name
 // and arguments, to the underlying internal tool, i.e. native_fetch.
+//
+// See also: [tools.CallInternalTool]
 func (c *openAIClient) processInternalToolCalls(
 	toolCalls []openai.ChatCompletionMessageToolCallUnion,
 ) ([]openai.ChatCompletionMessageParamUnion, error) {
@@ -214,16 +215,9 @@ func (c *openAIClient) processInternalToolCalls(
 			return session, fmt.Errorf("openai: unsupported tool call: %s", tc.Function.Name)
 		}
 
-		var args struct {
-			Url string `json:"url"`
-		}
-		decoder := json.NewDecoder(strings.NewReader(tc.Function.Arguments))
-		decoder.DisallowUnknownFields()
-		decoder.Decode(&args)
-
 		// IMPORTANT: This executes a call to the custom tool `native_fetch`
 		// as implemented in `api/tools/native_fetch.go`.
-		fetchResult, err := tools.CallInternalTool("native_fetch", args.Url)
+		fetchResult, err := tools.CallInternalTool("native_fetch", tc.Function.Arguments)
 		if err != nil {
 			return session, fmt.Errorf("openai: failed to call tool native_fetch: %w", err)
 		}

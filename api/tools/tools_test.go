@@ -34,7 +34,7 @@ func TestNativeFetch(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		result, err := native_fetch(context.Background(), srv.URL)
+		result, err := native_fetch(context.Background(), `{ "url": "`+srv.URL+`" }`)
 		require.NoError(t, err)
 		assert.Equal(t, "FETCHED CONTENT", result)
 	})
@@ -44,9 +44,9 @@ func TestNativeFetch(t *testing.T) {
 		url := srv.URL
 		srv.Close() // ensure connection refused
 
-		result, err := native_fetch(context.Background(), url)
+		result, err := native_fetch(context.Background(), `{ "url": "`+url+`" }`)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "http get")
+		assert.Contains(t, err.Error(), "http request failed")
 		assert.Empty(t, result)
 	})
 
@@ -61,7 +61,7 @@ func TestNativeFetch(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		result, err := fn(context.Background(), srv.URL)
+		result, err := fn(context.Background(), `{ "url": "`+srv.URL+`" }`)
 		require.NoError(t, err)
 		assert.Equal(t, "REGISTRY FETCH", result)
 	})

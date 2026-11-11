@@ -2,6 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/openai/openai-go/v3"
@@ -31,6 +34,99 @@ func TestBuildPromptFromRequest(t *testing.T) {
 		prompt, numTokens := buildPromptFromRequest(req)
 		assert.Equal(t, "Hello", prompt)
 		assert.Equal(t, len("Hello"), numTokens)
+	})
+}
+
+// sseToolCallBody returns an SSE-formatted chat completion stream body with a
+// single tool call delta for the given function name and arguments.
+func sseToolCallBody(name, arguments string) string {
+	chunk, err := json.Marshal(map[string]any{
+		"id":     "chatcmpl-test",
+		"object": "chat.completion.chunk",
+		"model":  "gpt-4",
+		"choices": []any{map[string]any{
+			"index": 0,
+			"delta": map[string]any{
+				"tool_calls": []any{map[string]any{
+					"index":    0,
+					"id":       "call-1",
+					"type":     "function",
+					"function": map[string]any{"name": name, "arguments": arguments},
+				}},
+			},
+		}},
+	})
+	if err != nil {
+		panic(err) // unreachable with static data
+	}
+	return "data: " + string(chunk) + "\n\ndata: [DONE]\n\n"
+}
+
+// TestClient_Chat_ToolCalls tests the native_fetch tool call injection flow:
+// the first Chat pass streams a tool call, the internal tool executes a real
+// http fetch, and the tool result is merged into the second pass messages.
+func TestClient_Chat_ToolCalls(t *testing.T) {
+	t.Run("native_fetch_tool_call", func(t *testing.T) {
+		fetchSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("FETCHED CONTENT"))
+		}))
+		defer fetchSrv.Close()
+
+		var receivedBodies []string
+		srv := newSSEServer(t, []string{
+			// 1st pass: model requests a native_fetch tool call.
+			sseToolCallBody("native_fetch", fmt.Sprintf(`{"url":%q}`, fetchSrv.URL)),
+			// 2nd pass: generates the response with the tool result.
+			sseBody("response"),
+		}, &receivedBodies)
+		defer srv.Close()
+
+		c := NewClient(srv.URL, "test-key")
+		resp, err := c.Chat("gpt-4", Request{
+			NewMessage("text/plain", []byte("Hi there")),
+		})
+		require.NoError(t, err)
+		require.Len(t, resp, 1)
+		assert.Equal(t, "response", resp[0].String())
+
+		// The tool result must be forwarded to the second pass.
+		require.Len(t, receivedBodies, 2)
+		assert.Contains(t, receivedBodies[1], `"role":"tool"`)
+		assert.Contains(t, receivedBodies[1], "FETCHED CONTENT")
+	})
+
+	t.Run("unsupported_tool_call", func(t *testing.T) {
+		srv := newSSEServer(t, []string{
+			sseToolCallBody("other_tool", `{"url":"https://evi.as"}`),
+		}, nil)
+		defer srv.Close()
+
+		c := NewClient(srv.URL, "test-key")
+		resp, err := c.Chat("gpt-4", Request{
+			NewMessage("text/plain", []byte("Hi there")),
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported tool call")
+		assert.Empty(t, resp)
+	})
+
+	t.Run("native_fetch_error", func(t *testing.T) {
+		fetchSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+		fetchURL := fetchSrv.URL
+		fetchSrv.Close() // ensure connection refused
+
+		srv := newSSEServer(t, []string{
+			sseToolCallBody("native_fetch", fmt.Sprintf(`{"url":%q}`, fetchURL)),
+		}, nil)
+		defer srv.Close()
+
+		c := NewClient(srv.URL, "test-key")
+		resp, err := c.Chat("gpt-4", Request{
+			NewMessage("text/plain", []byte("Hi there")),
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to call tool native_fetch")
+		assert.Empty(t, resp)
 	})
 }
 

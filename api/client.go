@@ -223,7 +223,7 @@ func (c *openAIClient) processInternalToolCalls(
 
 		// IMPORTANT: This executes a call to the custom tool `native_fetch`
 		// as implemented in `api/tools/native_fetch.go`.
-		fetchResult, err := tools.KnownToolsFn["native_fetch"](args.Url)
+		fetchResult, err := tools.CallInternalTool("native_fetch", args.Url)
 		if err != nil {
 			return session, fmt.Errorf("openai: failed to call tool native_fetch: %w", err)
 		}

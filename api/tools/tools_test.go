@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +34,7 @@ func TestNativeFetch(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		result, err := native_fetch(srv.URL)
+		result, err := native_fetch(context.Background(), srv.URL)
 		require.NoError(t, err)
 		assert.Equal(t, "FETCHED CONTENT", result)
 	})
@@ -43,7 +44,7 @@ func TestNativeFetch(t *testing.T) {
 		url := srv.URL
 		srv.Close() // ensure connection refused
 
-		result, err := native_fetch(url)
+		result, err := native_fetch(context.Background(), url)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "http get")
 		assert.Empty(t, result)
@@ -51,7 +52,7 @@ func TestNativeFetch(t *testing.T) {
 
 	t.Run("known_tools_fn_registry", func(t *testing.T) {
 		// The native_fetch tool must be registered for the LLM tool call flow.
-		fn, ok := KnownToolsFn["native_fetch"]
+		fn, ok := internalToolsByName["native_fetch"]
 		require.True(t, ok)
 		require.NotNil(t, fn)
 
@@ -60,20 +61,8 @@ func TestNativeFetch(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		result, err := fn(srv.URL)
+		result, err := fn(context.Background(), srv.URL)
 		require.NoError(t, err)
 		assert.Equal(t, "REGISTRY FETCH", result)
 	})
-}
-
-// TestKnownTools tests the list of known tool names.
-func TestKnownTools(t *testing.T) {
-	assert.Contains(t, KnownTools, "native_fetch")
-
-	// Every known tool name must have a registered implementation.
-	for _, name := range KnownTools {
-		fn, ok := KnownToolsFn[name]
-		require.Truef(t, ok, "tool %q has no registered implementation", name)
-		assert.NotNil(t, fn)
-	}
 }

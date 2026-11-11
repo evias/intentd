@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	tc "github.com/stef41/llm-tokencount"
 
 	"github.com/evias/intentd/api"
 	"github.com/evias/intentd/cmd/internal"
@@ -122,7 +123,9 @@ review processes.`,
 				return argsErr
 			}
 
-			slog.Debug("Prompt template executed", "prompt", prompt)
+			slog.Debug("Prompt template executed",
+				"prompt", prompt,
+				"numTokens", tc.CountTokens(prompt))
 
 			if !quietMode {
 				fmt.Printf("> ")
@@ -143,8 +146,7 @@ review processes.`,
 				return err
 			}
 
-			slog.Debug("Provider call successful", "model", modelName, "res", response)
-
+			numTokens := 0
 			responseBz := []byte{}
 			for _, resp := range response {
 				responseBz = append(responseBz, resp.Raw()...)
@@ -152,7 +154,14 @@ review processes.`,
 				if resp.IsText() && !quietMode {
 					fmt.Printf("\n%s\n", resp.String())
 				}
+
+				numTokens += tc.CountTokens(resp.String())
 			}
+
+			slog.Debug("Provider call successful",
+				"model", modelName,
+				"res", response,
+				"numTokens", numTokens)
 
 			// Saves output to file with --output|-o.
 			if len(outputFile) > 0 {

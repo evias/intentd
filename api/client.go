@@ -40,7 +40,7 @@ func NewClient(baseURL, apiKey string, options ...ClientOption) Client {
 		client: openai.NewClient(
 			option.WithBaseURL(baseURL),
 			option.WithAPIKey(apiKey),
-			// option.WithMiddleware(debugResponseMiddleware),
+			option.WithMiddleware(debugResponseMiddleware),
 		),
 	}
 
@@ -245,7 +245,7 @@ func debugResponseMiddleware(req *http.Request, mn option.MiddlewareNext) (*http
 	}
 	// clone body for logging (body is a stream, must re-fill it)
 	b, _ := io.ReadAll(resp.Body)
-	slog.Error("RAW RESPONSE", "status", resp.Status, "ct", resp.Header.Get("Content-Type"), "body", string(b))
+	slog.Debug("RAW RESPONSE", "status", resp.Status, "ct", resp.Header.Get("Content-Type"), "body", string(b))
 	resp.Body = io.NopCloser(bytes.NewReader(b))
 	return resp, err
 }

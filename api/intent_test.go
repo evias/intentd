@@ -323,10 +323,6 @@ prompt: |
 	})
 
 	t.Run("unreadable_file", func(t *testing.T) {
-		if os.Getuid() == 0 {
-			t.Skip("test requires non-root user (unreadable file permissions)")
-		}
-
 		cfgFile := filepath.Join(t.TempDir(), "unreadable.yaml")
 		require.NoError(t, os.WriteFile(cfgFile, []byte("name: test"), 0000))
 

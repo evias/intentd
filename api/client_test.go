@@ -201,9 +201,6 @@ func TestOpenAIClient_Image(t *testing.T) {
 	})
 
 	t.Run("empty_data_panics", func(t *testing.T) {
-		t.Skip("known bug: Image indexes image.Data[0] without a length check, " +
-			"panicking when the API returns zero images (api/client.go); " +
-			"to fix during the planned refactor round")
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"created":123,"data":[]}`))

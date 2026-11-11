@@ -120,6 +120,11 @@ func (c *openAIClient) Image(model string, req Request) (Response, error) {
 		return Response{}, fmt.Errorf("openai: failed to execute image generation: %w", err)
 	}
 
+	// "should not happen", but it does. ;)
+	if len(image.Data) == 0 {
+		return Response{}, fmt.Errorf("openai: image generation failed to send image data")
+	}
+
 	imageBz, err := base64.StdEncoding.DecodeString(image.Data[0].B64JSON)
 	if err != nil {
 		return Response{}, fmt.Errorf("openai: failed to decode image base64: %w", err)

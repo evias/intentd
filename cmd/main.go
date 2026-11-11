@@ -24,6 +24,7 @@ const (
 var (
 	intentName   string
 	modelName    string
+	outputFile   string
 	apiKey       string
 	apiUrl       string
 	includePaths = []string{}
@@ -33,7 +34,7 @@ var (
 
 func NewCmd() *cobra.Command {
 	intentdCmd := &cobra.Command{
-		Use:   "intentd <intent> [input]",
+		Use:   "intentd <intent> [flags]",
 		Short: "intentd runs agentic Intents",
 		Long: `intentd is a terminal user interface to run agentic Intents.
 
@@ -57,6 +58,13 @@ review processes.`,
 					Level: logLevel,
 				})
 				slog.SetDefault(slog.New(handler))
+			}
+
+			// Make sure outputFile is writeable.
+			if len(outputFile) > 0 {
+				if err := ensureWriteable(outputFile); err != nil {
+					return err
+				}
 			}
 
 			return nil
@@ -116,6 +124,11 @@ review processes.`,
 
 			slog.Debug("Prompt template executed", "prompt", prompt)
 
+			if !quietMode {
+				fmt.Printf("> ")
+				fmt.Printf("%s\n", prompt)
+			}
+
 			provider := api.NewProvider("OpenAI API Provider", apiUrl,
 				api.WithAPIKey(apiKey),
 			)
@@ -130,11 +143,25 @@ review processes.`,
 				return err
 			}
 
+			slog.Debug("Provider call successful", "model", modelName, "res", response)
+
+			var responseText strings.Builder
 			if !quietMode {
-				slog.Info("Provider call successful", "req", request, "res", response)
-			} else {
-				// in quiet mode, print only in debug log.
-				slog.Debug("Provider call successful", "req", request, "res", response)
+				for _, resp := range response {
+					responseText.WriteString(resp.String())
+					fmt.Printf("\n%s\n", resp.String())
+				}
+			}
+
+			// Saves output to file with --output|-o.
+			if len(outputFile) > 0 {
+				f, err := os.OpenFile(outputFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+				if err != nil {
+					return err
+				}
+
+				f.WriteString(responseText.String())
+				f.Close()
 			}
 
 			return nil
@@ -151,6 +178,8 @@ review processes.`,
 		"Sets the API URL used for the OpenAI client connection (optional).")
 	intentdCmd.Flags().StringVarP(&modelName, "model", "m", defaultModelName,
 		"Sets the model that will be used for this conversation (optional).")
+	intentdCmd.Flags().StringVarP(&outputFile, "output", "o", "",
+		"Sets an output file to which the response will be appended (optional).")
 	intentdCmd.Flags().StringArrayVarP(&includePaths, "include", "I", []string{defaultIncludePath},
 		"Specify folders to include for the intents search (optional).")
 	intentdCmd.Flags().BoolVarP(&quietMode, "quiet", "Q", false,
@@ -202,6 +231,15 @@ func ensureIncludePaths(paths []string) error {
 		}
 	}
 	return nil
+}
+
+// ensureWriteable ensures that --output option is a writeable file path.
+func ensureWriteable(path string) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0o644)
+	if err != nil {
+		return fmt.Errorf("--output %q: file not writeable: %w", path, err)
+	}
+	return f.Close()
 }
 
 // findIntents walks includePath to search for .(yaml|yml) files.

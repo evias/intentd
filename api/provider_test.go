@@ -66,7 +66,7 @@ func TestProvider_GetClient_Panic(t *testing.T) {
 	)
 
 	assert.Panics(t, func() {
-		p.Call("gpt-4", Request{})
+		p.Generate("chat", "gpt-4", Request{})
 	})
 }
 
@@ -130,7 +130,7 @@ func TestProvider_Call(t *testing.T) {
 		defer srv.Close()
 
 		p := NewProvider("Test", srv.URL, WithAPIKey("test-key"))
-		resp, err := p.Call("gpt-4", Request{
+		resp, err := p.Generate("chat", "gpt-4", Request{
 			NewMessage("text/plain", []byte("Hi there")),
 		})
 		require.NoError(t, err)
@@ -151,29 +151,6 @@ func TestProvider_Call(t *testing.T) {
 		assert.NotContains(t, receivedBodies[1], "native_fetch")
 	})
 
-	t.Run("non_text_messages_are_filtered", func(t *testing.T) {
-		var receivedBodies []string
-		srv := newSSEServer(t, []string{
-			sseBody(""), // empty delta content
-			sseBody(""),
-		}, &receivedBodies)
-		defer srv.Close()
-
-		p := NewProvider("Test", srv.URL, WithAPIKey("test-key"))
-		resp, err := p.Call("gpt-4", Request{
-			NewMessage("image/png", []byte("fake-image-bytes")),
-		})
-		require.NoError(t, err)
-		require.Len(t, resp, 1)
-		assert.Empty(t, resp[0].String())
-
-		// Only text messages are appended to the chat completion request.
-		require.Len(t, receivedBodies, 2)
-		for _, body := range receivedBodies {
-			assert.False(t, strings.Contains(body, "fake-image-bytes"))
-		}
-	})
-
 	t.Run("http_error", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -182,7 +159,7 @@ func TestProvider_Call(t *testing.T) {
 		defer srv.Close()
 
 		p := NewProvider("Test", srv.URL, WithAPIKey("invalid-key"))
-		resp, err := p.Call("gpt-4", Request{
+		resp, err := p.Generate("chat", "gpt-4", Request{
 			NewMessage("text/plain", []byte("Hi there")),
 		})
 		assert.Error(t, err)

@@ -126,7 +126,7 @@ review processes.`,
 					api.NewMessage("text/plain", []byte(prompt)),
 				}
 			)
-			if response, err = provider.Call(modelName, request); err != nil {
+			if response, err = provider.Generate(intent.Type(), modelName, request); err != nil {
 				return err
 			}
 

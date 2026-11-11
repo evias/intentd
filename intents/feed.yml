@@ -1,4 +1,5 @@
 name: "Feed"
+type: "chat"
 description: "This intent summarizes a feed into Weekly Insights"
 fields:
   url:

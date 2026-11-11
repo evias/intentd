@@ -5,6 +5,13 @@ import (
 	"unicode/utf8"
 )
 
+type OutputType string
+
+const (
+	OutputTypeChat  OutputType = "chat"
+	OutputTypeImage OutputType = "image"
+)
+
 // IntentConfig describes an intent configuration file which defines the
 // configuration fields, input fields and system prompt of an intent.
 //
@@ -12,6 +19,7 @@ import (
 // YAML configuration files may also contain a description.
 type IntentConfig struct {
 	Name        string                 `yaml:"name"`
+	OutputType  OutputType             `yaml:"type"`
 	Description string                 `yaml:"description"`
 	Fields      map[string]FieldConfig `yaml:"fields"`
 	Prompt      string                 `yaml:"prompt"`

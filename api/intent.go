@@ -15,6 +15,8 @@ import (
 type Intent interface {
 	// Name should return the intent's name.
 	Name() string
+	// Type should return the intent's output type, i.e. chat or image.
+	Type() OutputType
 	// Template should return the prompt template.
 	Template() *tmpl.Template
 	// Config should return the intent configuration.
@@ -92,6 +94,11 @@ func LoadFromConfig(
 // Name returns the name as read from [IntentConfig] upon creation.
 func (intent *agentIntent) Name() string {
 	return intent.name
+}
+
+// Type returns the type as read from [IntentConfig] upon creation.
+func (intent *agentIntent) Type() OutputType {
+	return intent.conf.OutputType
 }
 
 // Template returns the name as read from [IntentConfig] upon creation.

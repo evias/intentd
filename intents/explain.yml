@@ -1,4 +1,5 @@
 name: "Explain"
+type: "chat"
 description: "This intent explains a topic in one or two paragraphs (ELI5)"
 fields:
   topic:

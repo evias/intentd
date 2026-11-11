@@ -112,7 +112,7 @@ func TestNewCmd(t *testing.T) {
 	require.NotNil(t, intentdCmd)
 
 	t.Run("usage", func(t *testing.T) {
-		assert.Equal(t, "intentd <intent> [input]", intentdCmd.Use)
+		assert.Equal(t, "intentd <intent> [flags]", intentdCmd.Use)
 		assert.Equal(t, "intentd runs agentic Intents", intentdCmd.Short)
 	})
 

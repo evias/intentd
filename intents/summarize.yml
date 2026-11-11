@@ -1,0 +1,26 @@
+name: "Summarize"
+type: "chat"
+description: "This intent summarizes a document after fetching it from a URL"
+fields:
+  url:
+    type: string
+    default: ""
+    required: true
+    allowEmpty: false
+prompt: >
+  Summarize the following document according to these instructions:
+  Summary structure:
+  One opening sentence capturing the central thesis or objective of the document.
+  The 3 to 5 key points, ranked by importance. The main conclusions or recommendations.
+  And the most significant data (if applicable).
+  Rules:
+  Target length: about 15.03% of the original document.
+  Stay faithful to the content without adding personal interpretation.
+  Preserve important nuances and reservations expressed by the author.
+  Use clear and accessible language.
+  Flag any ambiguous or contradictory elements in the document.
+  Output format:
+  Start with a line "📄 Summary of: [DOCUMENT_TITLE]"
+  Use bullet points for key points
+  End with a "Key takeaway" section in one sentence
+  Document to summarize: {{.Url}}.

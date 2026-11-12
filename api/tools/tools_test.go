@@ -15,7 +15,7 @@ import (
 // chat completion API.
 func TestGetInternalTools(t *testing.T) {
 	tools := GetInternalTools()
-	require.Len(t, tools, 1)
+	require.Len(t, tools, 2)
 
 	bz, err := json.Marshal(tools[0])
 	require.NoError(t, err)

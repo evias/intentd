@@ -210,19 +210,19 @@ func (c *openAIClient) processInternalToolCalls(
 ) ([]openai.ChatCompletionMessageParamUnion, error) {
 	session := []openai.ChatCompletionMessageParamUnion{}
 	for _, tc := range toolCalls {
-		// Only native_fetch is supported with this method.
-		if tc.Function.Name != "native_fetch" {
+		// Tool calls for internal tools only
+		if !tools.HasInternalTool(tc.Function.Name) {
 			return session, fmt.Errorf("openai: unsupported tool call: %s", tc.Function.Name)
 		}
 
-		// IMPORTANT: This executes a call to the custom tool `native_fetch`
+		// IMPORTANT: This executes a call to the internal tools, e.g. `native_fetch`
 		// as implemented in `api/tools/native_fetch.go`.
-		fetchResult, err := tools.CallInternalTool("native_fetch", tc.Function.Arguments)
+		toolResult, err := tools.CallInternalTool(tc.Function.Name, tc.Function.Arguments)
 		if err != nil {
-			return session, fmt.Errorf("openai: failed to call tool native_fetch: %w", err)
+			return session, fmt.Errorf("openai: failed to call tool %s: %w", tc.Function.Name, err)
 		}
 
-		session = append(session, openai.ToolMessage(fetchResult, tc.ID))
+		session = append(session, openai.ToolMessage(toolResult, tc.ID))
 	}
 
 	return session, nil

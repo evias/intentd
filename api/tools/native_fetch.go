@@ -17,6 +17,7 @@ const (
 // A MaxFetchPayload limit of bytes is set to read the body. This should be
 // way above what is usually necessary and covers images/audio as well.
 // Use [CallInternalTool] to execute this tool.
+// The argsJSON parameter must contain valid JSON, with required fields: url.
 // This function implements [ToolFunc].
 func native_fetch(
 	ctx context.Context,
@@ -29,7 +30,7 @@ func native_fetch(
 	decoder := json.NewDecoder(strings.NewReader(argsJSON))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&args); err != nil {
-		return "", fmt.Errorf("native_fetch: arguments failed to decode: %w", err)
+		return "", fmt.Errorf("arguments failed to decode: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, args.Url, nil)
@@ -39,23 +40,23 @@ func native_fetch(
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("native_fetch: http request failed: %w", err)
+		return "", fmt.Errorf("http request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// pre-check size
 	if resp.ContentLength > MaxFetchPayload {
-		return "", fmt.Errorf("native_fetch: content-length %d exceeds max", resp.ContentLength)
+		return "", fmt.Errorf("content-length %d exceeds max", resp.ContentLength)
 	}
 
 	// sanity cap of 16Mb stops reading further
 	limitReader := io.NopCloser(io.LimitReader(resp.Body, MaxFetchPayload+1))
 	body, err := io.ReadAll(limitReader)
 	if err != nil {
-		return "", fmt.Errorf("native_fetch: response body read error: %w", err)
+		return "", fmt.Errorf("response body read error: %w", err)
 	}
 	if len(body) > MaxFetchPayload {
-		return "", fmt.Errorf("native_fetch: response exceeds %d bytes", MaxFetchPayload)
+		return "", fmt.Errorf("response exceeds %d bytes", MaxFetchPayload)
 	}
 	return string(body), nil
 }

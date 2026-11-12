@@ -24,36 +24,28 @@ type ToolResult struct {
 // ToolCallConfig contains configuration fields for individual tool calls.
 type ToolCallConfig struct {
 	MaxRuntimeSeconds time.Duration
+	EnableDebugLog    bool
 }
 
 var DefaultToolCallConfig = ToolCallConfig{
 	MaxRuntimeSeconds: ToolCallMaxRuntimeSeconds,
+	EnableDebugLog:    false,
 }
 
 // Closures mapping.
 var internalToolsByName = map[string]ToolFunc{
-	"native_fetch": native_fetch,
+	"native_fetch":    native_fetch,
+	"filesystem_read": filesystem_read,
 }
 
-// GetInternalTools returns a list of internal tools enabled with this library.
-func GetInternalTools() []openai.ChatCompletionToolUnionParam {
-	tools := []openai.ChatCompletionToolUnionParam{}
-	tools = append(tools, openai.ChatCompletionFunctionTool(openai.FunctionDefinitionParam{
-		Name:        "native_fetch",
-		Description: openai.String("Internal URL fetch tool"),
-		Strict:      openai.Bool(true),
-		Parameters: openai.FunctionParameters{
-			"type":                 "object",
-			"additionalProperties": false,
-			"properties": map[string]any{
-				"url": map[string]string{
-					"type": "string",
-				},
-			},
-			"required": []string{"url"},
-		},
-	}))
-	return tools
+// ----------------------------------------------------------------------------
+
+// HasInternalTool checks for the presence of an internal tool by its name.
+func HasInternalTool(name string) bool {
+	if _, ok := internalToolsByName[name]; ok {
+		return true
+	}
+	return false
 }
 
 // CallInternalTool executes an internal tool call by name.
@@ -100,4 +92,44 @@ func CallInternalToolWithConfig(
 	}
 
 	return result.Value, result.Err
+}
+
+// ----------------------------------------------------------------------------
+
+// GetInternalTools returns a list of internal tools enabled with this library.
+func GetInternalTools() []openai.ChatCompletionToolUnionParam {
+	tools := []openai.ChatCompletionToolUnionParam{}
+	tools = append(tools, []openai.ChatCompletionToolUnionParam{
+		openai.ChatCompletionFunctionTool(openai.FunctionDefinitionParam{
+			Name:        "native_fetch",
+			Description: openai.String("Internal URL fetch tool"),
+			Strict:      openai.Bool(true),
+			Parameters: openai.FunctionParameters{
+				"type":                 "object",
+				"additionalProperties": false,
+				"properties": map[string]any{
+					"url": map[string]string{
+						"type": "string",
+					},
+				},
+				"required": []string{"url"},
+			},
+		}),
+		openai.ChatCompletionFunctionTool(openai.FunctionDefinitionParam{
+			Name:        "filesystem_read",
+			Description: openai.String("Internal filesystem read tool"),
+			Strict:      openai.Bool(true),
+			Parameters: openai.FunctionParameters{
+				"type":                 "object",
+				"additionalProperties": false,
+				"properties": map[string]any{
+					"path": map[string]string{
+						"type": "string",
+					},
+				},
+				"required": []string{"path"},
+			},
+		}),
+	}...)
+	return tools
 }

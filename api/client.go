@@ -16,6 +16,13 @@ import (
 	"github.com/evias/intentd/api/tools"
 )
 
+const (
+	// This contains a conservative upperbound for the number of consecutive
+	// tool calls that may be executed. This forbids the model to exile on a
+	// never-ending scraping task when presented with a URL.
+	MaxRecursiveToolCallDepth = 3
+)
+
 // ----------------------------------------------------------------------------
 
 type Client interface {
@@ -71,30 +78,51 @@ func (c *openAIClient) Chat(model string, req Request) (Response, error) {
 		Tools:    tools.GetInternalTools(),
 	}
 
-	// 1) First pass with Tools will inject a call to [tools.native_fetch].
-	firstResponse, sessionMsgs, err := c.executeChatCompletionWithToolCalls(apiParams)
-	if err != nil {
-		return Response{}, fmt.Errorf("openai: failed to execute chat completion: %w", err)
+	// 1) First X passes with Tools will inject calls to internal tools if necessary.
+	//
+	// IMPORTANT: This will run one or many passes of Chat Completion API roundtrips,
+	// to permit executing multi-stage internal tools, e.g. reading a file with URL.
+	// IMPORTANT: The responses for tool-call rounds are *discarded* as not final.
+	//
+	// This loop's break condition evaluates whether sessionMsgs contains tool call
+	// messages, it will be empty otherwise. When empty, proceed to final completion.
+	var (
+		responseText strings.Builder
+		sessionMsgs  []openai.ChatCompletionMessageParamUnion
+		err          error
+	)
+	for num := 0; num < MaxRecursiveToolCallDepth && (num == 0 || len(sessionMsgs) > 0); num++ {
+		slog.Debug(fmt.Sprintf("Starting completion round #%d", num+1), "model", model)
+
+		_, sessionMsgs, err = c.executeChatCompletionWithToolCalls(apiParams)
+		if err != nil {
+			return Response{}, fmt.Errorf("openai: failed to execute chat completion: %w", err)
+		}
+
+		// merges the tool call messages before we start the second pass.
+		if len(sessionMsgs) > 0 {
+			apiParams.Messages = append(apiParams.Messages, sessionMsgs...)
+		}
+
+		slog.Debug(fmt.Sprintf("Completed completion round #%d", num+1), "model", model)
 	}
 
-	// merges the tool call messages before we start the second pass.
-	if len(sessionMsgs) > 0 {
-		apiParams.Messages = append(apiParams.Messages, sessionMsgs...)
-	}
+	slog.Debug("Now executing final completion round", "model", model)
 
-	// 2) Second pass without Tools, should generate response.
+	// 2) Final pass without Tools, should generate response, i.e. answer.
 	apiParams.Tools = nil // set nil to omit from request
-	secondResponse, _, err := c.executeChatCompletionWithToolCalls(apiParams)
+	finalResponse, _, err := c.executeChatCompletionWithToolCalls(apiParams)
 	if err != nil {
 		return Response{}, fmt.Errorf("openai: failed to execute chat completion: %w", err)
 	}
+	responseText.WriteString(finalResponse)
 
 	slog.Debug("Streaming response for Chat Completion API",
 		"model", model,
-		"len", len(secondResponse))
+		"len", responseText.Len())
 
 	return Response{
-		NewMessage("text/plain", []byte(firstResponse+secondResponse)),
+		NewMessage("text/plain", []byte(responseText.String())),
 	}, nil
 }
 
@@ -144,9 +172,15 @@ func (c *openAIClient) Image(model string, req Request) (Response, error) {
 // executeChatCompletionWithToolCalls executes a single pass of a chat
 // completion streaming request/response, it evaluates potential tool
 // calls and injects a call to the "native_fetch" tool if necessary.
+//
+// Returns a responseText, []ChatCompletionMessageParamUnion, error
 func (c *openAIClient) executeChatCompletionWithToolCalls(
 	apiParams openai.ChatCompletionNewParams,
-) (string, []openai.ChatCompletionMessageParamUnion, error) {
+) (
+	string,
+	[]openai.ChatCompletionMessageParamUnion,
+	error,
+) {
 	session := []openai.ChatCompletionMessageParamUnion{}
 	stream := c.client.Chat.Completions.NewStreaming(
 		context.Background(),

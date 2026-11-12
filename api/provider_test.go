@@ -110,7 +110,7 @@ func TestProvider_ClientCaching(t *testing.T) {
 func TestProvider_Generate_UnknownOutputType(t *testing.T) {
 	var receivedBodies []string
 	srv := newSSEServer(t, []string{
-		sseBody("Hello!"),  // 1st pass
+		sseBody("Hello!"),  // 1st pass (will be discarded!)
 		sseBody("Replied"), // 2nd pass
 	}, &receivedBodies)
 	defer srv.Close()
@@ -124,7 +124,7 @@ func TestProvider_Generate_UnknownOutputType(t *testing.T) {
 
 	// Unknown output types are handled by the Chat flow.
 	assert.True(t, resp[0].IsText())
-	assert.Equal(t, "Hello!Replied", resp[0].String())
+	assert.Equal(t, "Replied", resp[0].String())
 }
 
 // sseBody returns a Server-Sent Events formatted chat completion stream body
@@ -181,7 +181,7 @@ func TestProvider_Call(t *testing.T) {
 	t.Run("text_message", func(t *testing.T) {
 		var receivedBodies []string
 		srv := newSSEServer(t, []string{
-			sseBody("Hello!"),      // 1st pass: tool detection
+			sseBody("Hello!"),      // 1st pass: tool detection (discarded)
 			sseBody("Hello again"), // 2nd pass: response generation
 		}, &receivedBodies)
 		defer srv.Close()
@@ -194,7 +194,7 @@ func TestProvider_Call(t *testing.T) {
 		require.Len(t, resp, 1)
 
 		assert.True(t, resp[0].IsText())
-		assert.Equal(t, "Hello!Hello again", resp[0].String())
+		assert.Equal(t, "Hello again", resp[0].String())
 
 		// The request body must contain the sent user message.
 		require.Len(t, receivedBodies, 2)

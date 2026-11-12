@@ -78,7 +78,9 @@ func TestClient_Chat_ToolCalls(t *testing.T) {
 		srv := newSSEServer(t, []string{
 			// 1st pass: model requests a native_fetch tool call.
 			sseToolCallBody("native_fetch", fmt.Sprintf(`{"url":%q}`, fetchSrv.URL)),
-			// 2nd pass: generates the response with the tool result.
+			// 2nd pass: model does not identify tool calls anymore.
+			sseBody(""),
+			// 3rd pass: generates the response with the tool result.
 			sseBody("response"),
 		}, &receivedBodies)
 		defer srv.Close()
@@ -92,9 +94,10 @@ func TestClient_Chat_ToolCalls(t *testing.T) {
 		assert.Equal(t, "response", resp[0].String())
 
 		// The tool result must be forwarded to the second pass.
-		require.Len(t, receivedBodies, 2)
-		assert.Contains(t, receivedBodies[1], `"role":"tool"`)
-		assert.Contains(t, receivedBodies[1], "FETCHED CONTENT")
+		require.Len(t, receivedBodies, 3)
+		assert.Contains(t, receivedBodies[1], `"role":"tool"`) // filesystem_read
+		assert.Contains(t, receivedBodies[2], `"role":"tool"`) // native_fetch
+		assert.Contains(t, receivedBodies[2], "FETCHED CONTENT")
 	})
 
 	t.Run("unsupported_tool_call", func(t *testing.T) {
